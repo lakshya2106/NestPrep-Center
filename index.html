@@ -179,12 +179,14 @@
   </div>
 </main>
 
+<div id="dsa-code-modal" class="modal" style="display:none;"><div class="modal-overlay" onclick="closeDSACodeModal()"></div><div class="modal-dialog"><div class="modal-header"><div><div class="modal-title" id="dsa-code-title">DSA Problem</div><div class="modal-level" id="dsa-code-level">Easy</div></div><button class="close-btn" onclick="closeDSACodeModal()">✕</button></div><div class="modal-body"><div style="display:flex;gap:16px;height:500px;flex-direction:column;"><div style="display:flex;gap:16px;flex:1;"><div style="flex:1;display:flex;flex-direction:column;"><div class="code-label">Problem Statement 📋</div><textarea id="dsa-problem-stmt" class="code-input" placeholder="Paste the problem statement here..."></textarea></div><div style="flex:1;display:flex;flex-direction:column;"><div class="code-label">Your Solution 💻</div><textarea id="dsa-solution-code" class="code-input" placeholder="Paste your code solution here..."></textarea></div></div><div style="display:flex;flex-direction:column;"><div class="code-label">Notes & Approach 📝</div><textarea id="dsa-notes" class="code-input" placeholder="Add approach, key insights, complexity analysis..." style="height:120px;"></textarea></div><div style="display:flex;gap:10px;"><button class="btn" onclick="openDSALink()">🔗 Open Problem Link</button></div></div></div><div class="modal-footer"><button class="btn" onclick="closeDSACodeModal()">Close</button><button class="btn primary" onclick="saveDSACode()">💾 Save Code & Notes</button></div></div></div></div>
+
 <div class="success-toast" id="toast"></div>
 
 <script>
 const STORE_KEY = 'pcc_v1';
 let USER = { name: 'User', role: 'Candidate', duration: 21 };
-let S = { days:{}, solved:{}, review:{}, custom:[], customQA:[], practice:{ sessions:[], submitted:{}, attempted:{}, startTimes:{} } };
+let S = { days:{}, solved:{}, review:{}, custom:[], customQA:[], dsaCodes:{}, practice:{ sessions:[], submitted:{}, attempted:{}, startTimes:{} } };
 
 function loadData() {
   try {
@@ -195,6 +197,12 @@ function loadData() {
       S = data.S || S;
     }
   } catch(e){}
+  
+  // Ensure dsaCodes exists (for new feature)
+  if (!S.dsaCodes) {
+    S.dsaCodes = {};
+  }
+  
   updateUI();
 }
 
@@ -744,7 +752,7 @@ function renderDSA(filter) {
   currentFilter = filter || currentFilter;
   const all = [...DSA, ...S.custom];
   const shown = currentFilter === 'all' ? all : currentFilter === 'review' ? all.filter(p => S.review[p.id]) : all.filter(p => p.topic === currentFilter);
-  document.getElementById('dsa-tbody').innerHTML = shown.map((p,i) => `<tr><td style="color:var(--text3);font-family:var(--mono);font-size:11px;">${i+1}</td><td><a class="prob-link" href="${p.link||'#'}" target="_blank">${p.name}</a></td><td><span class="topic-pill">${p.topic}</span></td><td><span class="diff-badge diff-${p.level}">${p.level}</span></td><td><button class="solve-btn ${S.solved[p.id]?'solved':''}" onclick="toggleSolved('${p.id}',this)" title="Solved">✓</button><button class="solve-btn review-btn ${S.review[p.id]?'flagged':''}" onclick="toggleReview('${p.id}',this)" title="Flag">★</button></td></tr>`).join('');
+  document.getElementById('dsa-tbody').innerHTML = shown.map((p,i) => `<tr><td style="color:var(--text3);font-family:var(--mono);font-size:11px;">${i+1}</td><td><a class="prob-link" href="${p.link||'#'}" target="_blank">${p.name}</a></td><td><span class="topic-pill">${p.topic}</span></td><td><span class="diff-badge diff-${p.level}">${p.level}</span></td><td><button class="solve-btn ${S.solved[p.id]?'solved':''}" onclick="toggleSolved('${p.id}',this)" title="Solved">✓</button><button class="solve-btn review-btn ${S.review[p.id]?'flagged':''}" onclick="toggleReview('${p.id}',this)" title="Flag">★</button><button class="solve-btn" onclick="openDSACodeEditor('${p.id}')" title="Save Code">💾</button></td></tr>`).join('');
   const solvedN = all.filter(p => S.solved[p.id]).length;
   document.getElementById('dsa-solved-n').textContent = solvedN;
   document.getElementById('dsa-total-n').textContent = all.length;
@@ -1199,6 +1207,84 @@ renderInterview();
 renderProtocol();
 renderPracticeDaily();
 updateOverview();
+
+// DSA Code Editor Functions
+let currentDSAProblem = null;
+
+function openDSACodeEditor(problemId) {
+  console.log('Opening DSA editor for problem ID:', problemId);
+  console.log('DSA array length:', DSA?.length || 'DSA not found');
+  console.log('Custom problems:', S.custom?.length || 0);
+  
+  const allProblems = [...DSA, ...S.custom];
+  console.log('Total problems:', allProblems.length);
+  console.log('Looking for problem with ID:', problemId);
+  
+  const problem = allProblems.find(p => {
+    console.log('Checking problem:', p.id, '===', problemId, '?', p.id === problemId);
+    return p.id === problemId;
+  });
+  
+  console.log('Problem found:', problem);
+  if (!problem) {
+    console.error('Problem not found with ID:', problemId);
+    alert('Error: Problem not found! ID: ' + problemId);
+    return;
+  }
+  
+  currentDSAProblem = problem;
+  const saved = (S.dsaCodes && S.dsaCodes[problemId]) || {};
+  
+  document.getElementById('dsa-code-title').textContent = problem.name;
+  document.getElementById('dsa-code-level').textContent = problem.level;
+  document.getElementById('dsa-problem-stmt').value = saved.statement || '';
+  document.getElementById('dsa-solution-code').value = saved.code || '';
+  document.getElementById('dsa-notes').value = saved.notes || '';
+  
+  const modal = document.getElementById('dsa-code-modal');
+  console.log('Modal found:', modal);
+  if (modal) {
+    modal.style.display = 'flex';
+    console.log('Modal opened successfully');
+  } else {
+    console.error('Modal element not found!');
+    alert('Error: Modal element not found!');
+  }
+}
+
+function closeDSACodeModal() {
+  const modal = document.getElementById('dsa-code-modal');
+  if (modal) {
+    modal.style.display = 'none';
+  }
+  currentDSAProblem = null;
+}
+
+function saveDSACode() {
+  if (!currentDSAProblem) return;
+  
+  // Ensure dsaCodes exists
+  if (!S.dsaCodes) {
+    S.dsaCodes = {};
+  }
+  
+  S.dsaCodes[currentDSAProblem.id] = {
+    statement: document.getElementById('dsa-problem-stmt').value,
+    code: document.getElementById('dsa-solution-code').value,
+    notes: document.getElementById('dsa-notes').value,
+    savedAt: new Date().toLocaleString()
+  };
+  
+  saveData();
+  toast('💾 Code saved for ' + currentDSAProblem.name + '!');
+  closeDSACodeModal();
+}
+
+function openDSALink() {
+  if (currentDSAProblem && currentDSAProblem.link) {
+    window.open(currentDSAProblem.link, '_blank');
+  }
+}
 
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('settings-name').value = USER.name;
